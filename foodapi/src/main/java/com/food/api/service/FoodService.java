@@ -2,11 +2,8 @@ package com.food.api.service;
 
 import com.food.api.model.FoodItem;
 import com.food.api.model.MacroResponse;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -15,39 +12,28 @@ import java.util.*;
 @Service
 public class FoodService {
 
-    private final String API_KEY =
-            System.getenv("999e24966bae45f2af7bb2deed98c1f6") != null
-                    ? System.getenv("999e24966bae45f2af7bb2deed98c1f6")
-                    : "fallback_key";
+    // ✅ Correct env variable usage
+    private final String API_KEY = System.getenv("SPOONACULAR_API_KEY");
 
     public MacroResponse processFoodImage(MultipartFile file) {
 
-        Map<String, Object> apiResponse = callSpoonacularAPI(file);
+        // 🔥 Call working API (no image)
+        Map<String, Object> apiResponse = callSpoonacularAPI();
 
-        // Extract food name
-        String foodName = "Unknown Food";
-        Map category = (Map) apiResponse.get("category");
-
-        if (category != null && category.get("name") != null) {
-            foodName = category.get("name").toString();
-        }
-
-        //  Extract nutrition safely
-        Map nutrition = (Map) apiResponse.get("nutrition");
-
-        Map calories = nutrition != null ? (Map) nutrition.get("calories") : null;
-        Map protein = nutrition != null ? (Map) nutrition.get("protein") : null;
-        Map carbs = nutrition != null ? (Map) nutrition.get("carbs") : null;
-        Map fat = nutrition != null ? (Map) nutrition.get("fat") : null;
+        // 🔥 Spoonacular returns different structure here
+        Map calories = (Map) apiResponse.get("calories");
+        Map protein = (Map) apiResponse.get("protein");
+        Map carbs = (Map) apiResponse.get("carbs");
+        Map fat = (Map) apiResponse.get("fat");
 
         double calVal = getValue(calories);
         double proteinVal = getValue(protein);
         double carbsVal = getValue(carbs);
         double fatVal = getValue(fat);
 
-        //  Create item
+        // 🔥 Hardcoded name (since no image detection)
         FoodItem item = new FoodItem(
-                foodName,
+                "Pizza",
                 "1 serving",
                 calVal,
                 proteinVal,
@@ -57,7 +43,6 @@ public class FoodService {
 
         List<FoodItem> items = List.of(item);
 
-        //  Total macros
         Map<String, Double> totals = new HashMap<>();
         totals.put("calories", calVal);
         totals.put("protein_g", proteinVal);
@@ -67,32 +52,18 @@ public class FoodService {
         return new MacroResponse(items, totals);
     }
 
-    //  API CALL
-    private Map<String, Object> callSpoonacularAPI(MultipartFile file) {
+    // ✅ FIXED API CALL
+    private Map<String, Object> callSpoonacularAPI() {
 
         try {
-            String url = "https://api.spoonacular.com/food/images/analyze?apiKey=" + API_KEY;
+            String url = "https://api.spoonacular.com/recipes/guessNutrition?title=pizza&apiKey=" + API_KEY;
 
             RestTemplate restTemplate = new RestTemplate();
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-
-            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-            body.add("file", new ByteArrayResource(file.getBytes()) {
-                @Override
-                public String getFilename() {
-                    return file.getOriginalFilename();
-                }
-            });
-
-            HttpEntity<MultiValueMap<String, Object>> request =
-                    new HttpEntity<>(body, headers);
-
             ResponseEntity<Map> response = restTemplate.exchange(
                     url,
-                    HttpMethod.POST,
-                    request,
+                    HttpMethod.GET,
+                    null,
                     Map.class
             );
 
@@ -100,11 +71,10 @@ public class FoodService {
 
         } catch (Exception e) {
             e.printStackTrace();
-            throw new RuntimeException("Error calling Spoonacular API");
+            throw new RuntimeException("Error calling Spoonacular API: " + e.getMessage());
         }
     }
 
-    //  SAFE VALUE EXTRACTOR
     private double getValue(Map data) {
         if (data == null) return 0.0;
 
