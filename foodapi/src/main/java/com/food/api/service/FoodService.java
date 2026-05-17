@@ -15,7 +15,10 @@ import java.util.*;
 @Service
 public class FoodService {
 
-    private final String API_KEY = "999e24966bae45f2af7bb2deed98c1f6";
+    private final String API_KEY =
+            System.getenv("999e24966bae45f2af7bb2deed98c1f6") != null
+                    ? System.getenv("999e24966bae45f2af7bb2deed98c1f6")
+                    : "fallback_key";
 
     public MacroResponse processFoodImage(MultipartFile file) {
 
